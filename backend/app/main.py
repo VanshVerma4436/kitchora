@@ -25,8 +25,14 @@ logging.basicConfig(
 )
 logger = logging.getLogger("kitchora.main")
 
-# Auto-create tables on startup
+# Auto-create tables & seed database on startup
 Base.metadata.create_all(bind=engine)
+try:
+    from app.db.seed import seed_database
+    seed_database()
+    logger.info("Database auto-seeded successfully on app startup.")
+except Exception as e:
+    logger.warning(f"Database auto-seed warning on app startup: {e}")
 
 app = FastAPI(
     title=settings.PROJECT_NAME,

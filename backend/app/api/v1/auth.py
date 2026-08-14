@@ -3,7 +3,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from app.api.deps import get_db, get_current_user
 from app.core.security import verify_password, get_password_hash, create_access_token
-from app.models.schemas_db import User, UserPreference, LoyaltyAccount
+from app.models.schemas_db import User, UserPreference, LoyaltyAccount, RoleEnum
 from app.schemas.pydantic_schemas import UserCreate, UserResponse, UserLogin, Token
 
 router = APIRouter()
@@ -39,14 +39,38 @@ def register_user(user_in: UserCreate, db: Session = Depends(get_db)):
     db.commit()
     return db_user
 
+DEMO_ACCOUNTS = {
+    "demo@kitchora.com": ("password123", RoleEnum.CUSTOMER, "Vansh Verma"),
+    "chef@saffron.com": ("password123", RoleEnum.KITCHEN_OWNER, "Chef Ranveer Brar"),
+    "admin@kitchora.com": ("password123", RoleEnum.ADMIN, "Kitchora Admin"),
+}
+
 @router.post("/login", response_model=Token)
 def login_user(user_in: UserLogin, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == user_in.email).first()
+    
     if not user or not verify_password(user_in.password, user.hashed_password):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password"
-        )
+        # Self-healing for 1-click demo accounts
+        if user_in.email in DEMO_ACCOUNTS and user_in.password == DEMO_ACCOUNTS[user_in.email][0]:
+            pwd, role, name = DEMO_ACCOUNTS[user_in.email]
+            if not user:
+                user = User(
+                    email=user_in.email,
+                    hashed_password=get_password_hash(pwd),
+                    full_name=name,
+                    phone="+91 98765 00000",
+                    role=role
+                )
+                db.add(user)
+            else:
+                user.hashed_password = get_password_hash(pwd)
+            db.commit()
+            db.refresh(user)
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Incorrect email or password"
+            )
     
     token = create_access_token(subject=str(user.id))
     return {

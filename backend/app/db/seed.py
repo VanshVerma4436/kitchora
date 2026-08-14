@@ -20,51 +20,64 @@ def seed_database():
     db: Session = SessionLocal()
 
     try:
-        # Check if user exists, but always ensure menu items and categories are present
-        customer = db.query(User).filter(User.email == "demo@kitchora.com").first()
-        if not customer:
-            logger.info("Seeding users...")
-            customer = User(
-                email="demo@kitchora.com",
-                hashed_password=get_password_hash("password123"),
-                full_name="Vansh Verma",
-                phone="+91 98765 43210",
-                role=RoleEnum.CUSTOMER
-            )
-            kitchen_owner = User(
-                email="chef@saffron.com",
-                hashed_password=get_password_hash("password123"),
-                full_name="Chef Ranveer Brar",
-                phone="+91 98765 11111",
-                role=RoleEnum.KITCHEN_OWNER
-            )
-            admin = User(
-                email="admin@kitchora.com",
-                hashed_password=get_password_hash("password123"),
-                full_name="Kitchora Admin",
-                phone="+91 98765 99999",
-                role=RoleEnum.ADMIN
-            )
-            db.add_all([customer, kitchen_owner, admin])
-            db.commit()
+        demo_users_data = [
+            {
+                "email": "demo@kitchora.com",
+                "password": "password123",
+                "full_name": "Vansh Verma",
+                "phone": "+91 98765 43210",
+                "role": RoleEnum.CUSTOMER
+            },
+            {
+                "email": "chef@saffron.com",
+                "password": "password123",
+                "full_name": "Chef Ranveer Brar",
+                "phone": "+91 98765 11111",
+                "role": RoleEnum.KITCHEN_OWNER
+            },
+            {
+                "email": "admin@kitchora.com",
+                "password": "password123",
+                "full_name": "Kitchora Admin",
+                "phone": "+91 98765 99999",
+                "role": RoleEnum.ADMIN
+            }
+        ]
 
-            addr = Address(
-                user_id=customer.id,
-                address_line1="Flat 402, Cyber Heights",
-                address_line2="Hitech City",
-                city="Hyderabad",
-                state="Telangana",
-                pincode="500081",
-                is_default=True
-            )
-            loyalty = LoyaltyAccount(
-                user_id=customer.id,
-                points_balance=450,
-                tier="GOLD",
-                referral_code="VANSH2026"
-            )
-            db.add_all([addr, loyalty])
-            db.commit()
+        for udata in demo_users_data:
+            existing = db.query(User).filter(User.email == udata["email"]).first()
+            if not existing:
+                u = User(
+                    email=udata["email"],
+                    hashed_password=get_password_hash(udata["password"]),
+                    full_name=udata["full_name"],
+                    phone=udata["phone"],
+                    role=udata["role"]
+                )
+                db.add(u)
+                db.commit()
+                db.refresh(u)
+                if udata["role"] == RoleEnum.CUSTOMER:
+                    addr = Address(
+                        user_id=u.id,
+                        address_line1="Flat 402, Cyber Heights",
+                        address_line2="Hitech City",
+                        city="Hyderabad",
+                        state="Telangana",
+                        pincode="500081",
+                        is_default=True
+                    )
+                    loyalty = LoyaltyAccount(
+                        user_id=u.id,
+                        points_balance=450,
+                        tier="GOLD",
+                        referral_code="VANSH2026"
+                    )
+                    db.add_all([addr, loyalty])
+                    db.commit()
+            else:
+                existing.hashed_password = get_password_hash(udata["password"])
+                db.commit()
 
         # Categories
         cat_names = ["Hyderabadi Biryani", "North Indian Specials", "South Indian Tiffin", "Indo-Chinese & Street", "Artisanal Pizza", "Desserts & Sweets", "High-Protein Bowls"]
